@@ -1,0 +1,148 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Relatórios - Controle Logístico</title>
+  <style>
+    body { font-family: Arial, sans-serif; background-color: #f5f5f5; padding: 20px; }
+    h1 { text-align: center; }
+    .filtros { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 20px; }
+    label { font-weight: bold; }
+    input, select, button {
+      padding: 8px; border: 1px solid #ccc; border-radius: 4px;
+    }
+    button {
+      background-color: #007BFF; color: white; cursor: pointer;
+    }
+    table {
+      width: 100%; border-collapse: collapse; background: white; margin-top: 20px; overflow-x: auto; }
+    th, td {
+      border: 1px solid #ddd; padding: 8px; text-align: center;
+    }
+    th { background-color: #007BFF; color: white; }
+    .export-buttons {
+      display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;
+    }
+    .totais {
+      margin-top: 20px; font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>Relatórios - Controle Logístico</h1>
+  <div class="filtros">
+    <div>
+      <label for="data_inicio">Data Inicial:</label>
+      <input type="date" id="data_inicio">
+    </div>
+    <div>
+      <label for="data_fim">Data Final:</label>
+      <input type="date" id="data_fim">
+    </div>
+    <div>
+      <label for="uni_embarque">UNI Embarque:</label>
+      <input type="text" id="uni_embarque" placeholder="Informe UNI">
+    </div>
+    <div>
+      <label for="unidade">Unidade de Embarque:</label>
+      <select id="unidade">
+        <option value="">Todas</option>
+        <option value="233">233</option>
+        <option value="234">234</option>
+        <option value="235">235</option>
+        <option value="237">237</option>
+      </select>
+    </div>
+    <button onclick="carregarDados()">Filtrar</button>
+  </div>
+
+  <div class="export-buttons">
+    <button onclick="exportarCSV()">Exportar CSV</button>
+    <button onclick="window.print()">Imprimir</button>
+  </div>
+
+  <table id="tabela">
+    <thead>
+      <tr id="cabecalho"></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div class="totais" id="totais"></div>
+
+  <script>
+    const cabecalhos = [
+      "Data Embarque", "UNI Embarque", "Cliente", "Cidade Origem", "Local Coleta",
+      "Cidade Destino", "Local Descarga", "Placa Cavalo", "Placas Carretas",
+      "Situação Cadastro", "Tipo de Cadastro", "Operador", "Motorista",
+      "Frete Empresa", "Frete Motorista", "Pedágio", "Produto", "Capacidade Total",
+      "Volume Manifestado", "Valor do Frete Empresa", "Adiantamento",
+      "Forma de Pagamento", "Matriz/Filial Último Embarque", "Licença Ambiental",
+      "Venc. Licença", "CR - IBAMA", "Venc. CR IBAMA", "Monitoramento",
+      "Situação", "CTE"
+    ];
+
+    document.getElementById("cabecalho").innerHTML = cabecalhos.map(h => `<th>${h}</th>`).join("");
+
+    async function carregarDados() {
+      const inicio = document.getElementById("data_inicio").value;
+      const fim = document.getElementById("data_fim").value;
+      const unidade = document.getElementById("unidade").value;
+      const uniEmbarque = document.getElementById("uni_embarque").value.trim();
+
+      const url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTF91cTWYg7sT_As2efW1uk25OoZ62kUKREVOwGRegaTlN_XmkBzD-qX7ULTxH1xLINGfMyp01jesCT/pub?output=csv';
+
+      const resposta = await fetch(url);
+      const texto = await resposta.text();
+      const linhas = texto.trim().split("\n").slice(1);
+
+      const tabela = document.querySelector("#tabela tbody");
+      tabela.innerHTML = "";
+
+      let totalFrete = 0;
+      let totalCarregamentos = 0;
+
+      linhas.forEach(linha => {
+        const colunas = linha.split(",");
+        const data = colunas[0];
+        const origem = colunas[2];
+
+        const dentroData = (!inicio || data >= inicio) && (!fim || data <= fim);
+        const unidadeMatch = !unidade || origem.includes(unidade);
+        const uniMatch = !uniEmbarque || origem.includes(uniEmbarque);
+
+        if (dentroData && unidadeMatch && uniMatch) {
+          const tr = document.createElement("tr");
+          cabecalhos.forEach((_, idx) => {
+            const td = document.createElement("td");
+            td.textContent = colunas[idx] || "";
+            tr.appendChild(td);
+          });
+          tabela.appendChild(tr);
+
+          const valorFrete = parseFloat(colunas[13].replace(',', '.')) || 0;
+          totalFrete += valorFrete;
+          totalCarregamentos++;
+        }
+      });
+
+      document.getElementById("totais").innerText = `Total de Carregamentos: ${totalCarregamentos} | Total Frete Empresa: R$ ${totalFrete.toFixed(2)}`;
+    }
+
+    function exportarCSV() {
+      const rows = Array.from(document.querySelectorAll("table tr"));
+      const csv = rows.map(row => Array.from(row.children).map(cell => `"${cell.textContent}"`).join(",")).join("\n");
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", "relatorio_logistico.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  </script>
+</body>
+</html>
